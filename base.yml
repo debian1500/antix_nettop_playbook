@@ -1,0 +1,71 @@
+- name: Set up AntiX nettop as mediacenter client
+  hosts: nettop
+  # Указываем конкретный хост
+
+  become: yes
+  # Запуск с правами root (аналог sudo)
+  #gather_facts: yes
+
+
+
+  vars: # Переменные
+    target_user: "nettop"
+    # Имя пользователя в системе
+
+
+
+  tasks:
+    # Задачи
+     - name: APT Update
+       apt:
+       # Модуль Apt
+
+         update_cache: yes
+         # Обновляем список пакетов (аналог apt update)
+
+         cache_valid_time: 3600
+         # Кэш обновится, только если с момента обновления прошло # больше одного часа (3600 секунд)
+
+       register: apt_result
+       # Сохраняет результат задачи в переменную apt_result
+
+       until: apt_result is success
+       # Повторять циклически задачу, пока она не завершится успешно
+
+       retries: 3    # Количество попыток
+       delay: 5      # Пауза между попытками - 5 секунд
+
+
+     - name: Установка пакетов
+       apt:
+        name:
+          - mpv         # Лёгкий плеер
+          - curl        # Запросы
+          - alsa-utils  # Управление звуком
+          - htop        # Мониторинг процессора
+          - ufw         # Файрвол
+        state: present  # Указывает, что пакет обязательно должен быть установлен
+
+     - name: Добавить пользователя в новые группы
+       user:
+         name: "{{ target_user }}" # Берём имя пользователя из переменной
+         groups: audio,video # В какие группы будем добавлять
+         append: yes # Добавить в новые группы, не удаляя из старых
+
+
+     - name: Создать папку для собственных скриптов
+       file:
+         path: "/home/{{ target_user }}/bin" # Указываем путь с использованием переменной
+         state: directory # Указываем тип
+         owner: "{{ target_user }}" # Владелец
+         group: "{{ target_user }}" # Группа
+         mode: '0755' # Права (аналог chmod)
+
+     - name: Разрешить SSH-соединения в UFW
+       ufw:
+         rule: allow
+         name: OpenSSH
+
+     - name: Включить файрвол UFW
+       ufw:
+         state: enabled
